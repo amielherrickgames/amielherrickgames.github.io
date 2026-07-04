@@ -1,3 +1,414 @@
-<!doctype html>
-   <html><head><title>Amiel Herrick Games</title></head>
-   <body><h1>Amiel Herrick Games</h1><p>Home of Frostillery!</p></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Frostillery — Fire to move. Slide to survive.</title>
+<meta name="description" content="Frostillery is a snowball tank duel on ice. Every shot's recoil slides your tank — aim, fire, and outmaneuver enemy tanks, waves, and bosses. Free on the App Store.">
+
+<!-- Social preview -->
+<meta property="og:title" content="Frostillery">
+<meta property="og:description" content="Fire to move. Slide to survive. A snowball tank battle on ice, free on the App Store.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://amielherrickgames.github.io/">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+<style>
+  /* ============================================================
+     Palette — lifted straight from the game's own SKColor values
+     ============================================================ */
+  :root {
+    --ice:        #BFE0F1;  /* arena background            */
+    --ice-deep:   #A3CFE8;  /* lake shading                */
+    --panel-blue: #1E478C;  /* store bars / dialogs        */
+    --win-blue:   #1A4D99;  /* "YOU WIN!" lettering        */
+    --coin-gold:  #D9A61A;  /* reward labels               */
+    --play-green: #268C4D;  /* buy / claim buttons         */
+    --snow:       #FFFFFF;
+    --ink:        #12233D;  /* dark text on ice            */
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(120% 80% at 50% 0%, var(--snow) 0%, var(--ice) 45%, var(--ice-deep) 100%);
+    min-height: 100vh;
+  }
+
+  a:focus-visible, button:focus-visible {
+    outline: 3px solid var(--win-blue);
+    outline-offset: 3px;
+    border-radius: 6px;
+  }
+
+  .wrap {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* ============================================================
+     Hero
+     ============================================================ */
+  .hero {
+    position: relative;
+    text-align: center;
+    padding: 72px 0 48px;
+    overflow: hidden;
+  }
+
+  /* faint skate-lines etched into the ice, like the game's lakes */
+  .hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(105deg, transparent 48%, rgba(255,255,255,.55) 49%, transparent 50.5%) 0 0 / 380px 100%,
+      linear-gradient(74deg,  transparent 61%, rgba(255,255,255,.4)  62%, transparent 63%)   0 0 / 520px 100%,
+      linear-gradient(96deg,  transparent 24%, rgba(255,255,255,.35) 25%, transparent 26%)   0 0 / 640px 100%;
+    pointer-events: none;
+  }
+
+  .studio-tag {
+    position: relative;
+    display: inline-block;
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--snow);
+    background: var(--panel-blue);
+    padding: 6px 16px;
+    border-radius: 999px;
+    margin-bottom: 22px;
+  }
+
+  /* Sticker lettering — thick white outline + soft drop, matching
+     the white sticker-stroke on every tank sprite in the game */
+  h1 {
+    position: relative;
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 700;
+    font-size: clamp(3rem, 10vw, 5.5rem);
+    line-height: 1;
+    letter-spacing: 0.01em;
+    color: var(--win-blue);
+    -webkit-text-stroke: 2px var(--snow);
+    paint-order: stroke fill;
+    text-shadow:
+      0 2px 0 rgba(255,255,255,.9),
+      0 6px 18px rgba(30, 71, 140, .25);
+  }
+
+  .tagline {
+    position: relative;
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 600;
+    font-size: clamp(1.2rem, 3.4vw, 1.7rem);
+    color: var(--panel-blue);
+    margin-top: 14px;
+  }
+
+  .pitch {
+    position: relative;
+    max-width: 520px;
+    margin: 14px auto 0;
+    font-size: 1.05rem;
+    line-height: 1.6;
+    color: var(--ink);
+  }
+
+  /* ---------- the rink: a looping demo of the core mechanic ---------- */
+  .rink {
+    position: relative;
+    height: 120px;
+    max-width: 560px;
+    margin: 30px auto 8px;
+  }
+
+  .tank {
+    position: absolute;
+    left: 18%;
+    top: 50%;
+    translate: 0 -50%;
+    width: 92px;
+    animation: recoil 3.6s ease-out infinite;
+  }
+
+  .snowball {
+    position: absolute;
+    left: calc(18% + 84px);
+    top: 50%;
+    translate: 0 -50%;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 32% 30%, #fff 0 55%, #d9ecf7 100%);
+    box-shadow: 0 2px 5px rgba(30,71,140,.25);
+    opacity: 0;
+    animation: launch 3.6s ease-out infinite;
+  }
+
+  @keyframes recoil {
+    0%, 34%   { transform: translateX(0); }
+    38%       { transform: translateX(-34px) rotate(-2deg); }  /* the kick */
+    62%       { transform: translateX(-46px); }                /* the slide */
+    88%, 100% { transform: translateX(0); }                    /* drift back */
+  }
+
+  @keyframes launch {
+    0%, 34%   { opacity: 0; transform: translateX(0) scale(.6); }
+    36%       { opacity: 1; transform: translateX(8px) scale(1); }
+    60%       { opacity: 1; transform: translateX(300px) scale(1); }
+    64%, 100% { opacity: 0; transform: translateX(330px) scale(.9); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tank, .snowball { animation: none; }
+    .snowball { opacity: 1; transform: translateX(150px); }
+  }
+
+  .rink-caption {
+    font-size: 0.85rem;
+    font-style: italic;
+    color: var(--panel-blue);
+    opacity: 0.75;
+  }
+
+  /* ---------- App Store button ---------- */
+  .store-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 28px;
+    padding: 14px 30px;
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 600;
+    font-size: 1.15rem;
+    color: var(--snow);
+    text-decoration: none;
+    background: linear-gradient(180deg, #2fa35c 0%, var(--play-green) 100%);
+    border: 2.5px solid rgba(255,255,255,.75);
+    border-radius: 16px;
+    box-shadow: 0 6px 16px rgba(38,140,77,.35), inset 0 1px 0 rgba(255,255,255,.35);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+
+  .store-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 22px rgba(38,140,77,.4), inset 0 1px 0 rgba(255,255,255,.35);
+  }
+
+  .store-btn svg { flex: none; }
+
+  /* ============================================================
+     How it plays
+     ============================================================ */
+  .features {
+    padding: 40px 0 12px;
+  }
+
+  .features h2, .shots h2 {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 600;
+    font-size: 1.6rem;
+    color: var(--win-blue);
+    text-align: center;
+    margin-bottom: 26px;
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+  }
+
+  .card {
+    background: rgba(255,255,255,.72);
+    border: 2px solid rgba(255,255,255,.9);
+    border-radius: 18px;
+    padding: 24px 20px;
+    box-shadow: 0 4px 14px rgba(30,71,140,.12);
+    backdrop-filter: blur(2px);
+  }
+
+  .card .emoji { font-size: 1.9rem; }
+
+  .card h3 {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: var(--panel-blue);
+    margin: 10px 0 6px;
+  }
+
+  .card p {
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+
+  /* ============================================================
+     Screenshots
+     ============================================================ */
+  .shots { padding: 44px 0 8px; }
+
+  .shot-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    justify-items: center;
+  }
+
+  .shot-row img {
+    width: 100%;
+    max-width: 240px;
+    border-radius: 22px;
+    border: 3px solid rgba(255,255,255,.9);
+    box-shadow: 0 10px 26px rgba(30,71,140,.22);
+  }
+
+  /* ============================================================
+     Footer
+     ============================================================ */
+  footer {
+    margin-top: 56px;
+    padding: 26px 0 34px;
+    background: var(--panel-blue);
+    color: rgba(255,255,255,.92);
+    text-align: center;
+    font-size: 0.9rem;
+  }
+
+  footer a {
+    color: var(--snow);
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  footer .foot-links {
+    margin-top: 8px;
+    display: flex;
+    justify-content: center;
+    gap: 22px;
+    flex-wrap: wrap;
+  }
+
+  /* ============================================================
+     Small screens
+     ============================================================ */
+  @media (max-width: 720px) {
+    .cards, .shot-row { grid-template-columns: 1fr; }
+    .shot-row img { max-width: 300px; }
+    .hero { padding-top: 56px; }
+    .rink { height: 100px; }
+    .tank { width: 76px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="studio-tag">Amiel Herrick Games</span>
+    <h1>FROSTILLERY</h1>
+    <p class="tagline">Fire to move. Slide to survive.</p>
+    <p class="pitch">
+      A snowball tank battle on a frozen lake. Every shot kicks your tank
+      backward across the ice — so your cannon is your engine. Aim, fire,
+      and outmaneuver enemy tanks, waves, and bosses.
+    </p>
+
+    <!-- The core mechanic, demonstrated: fire → recoil → slide -->
+    <div class="rink" aria-hidden="true">
+      <svg class="tank" viewBox="0 0 100 62" xmlns="http://www.w3.org/2000/svg">
+        <!-- treads -->
+        <rect x="8"  y="2"  width="76" height="14" rx="7" fill="#2d3e57"/>
+        <rect x="8"  y="46" width="76" height="14" rx="7" fill="#2d3e57"/>
+        <!-- hull -->
+        <rect x="14" y="10" width="64" height="42" rx="12" fill="#2e6db8" stroke="#ffffff" stroke-width="3"/>
+        <!-- turret -->
+        <circle cx="46" cy="31" r="14" fill="#3f83cf" stroke="#ffffff" stroke-width="3"/>
+        <!-- barrel -->
+        <rect x="58" y="26" width="34" height="10" rx="5" fill="#9db6cf" stroke="#ffffff" stroke-width="2.5"/>
+        <circle cx="46" cy="31" r="5" fill="#1E478C"/>
+      </svg>
+      <span class="snowball"></span>
+    </div>
+    <p class="rink-caption">Recoil is how you drive.</p>
+
+    <!-- ⬇️ REPLACE href with your App Store link once you have it:
+         https://apps.apple.com/app/idXXXXXXXXXX  -->
+    <a class="store-btn" href="https://apps.apple.com/" aria-label="Download Frostillery on the App Store">
+      <svg width="22" height="26" viewBox="0 0 22 26" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M18.1 13.8c0-3 2.5-4.5 2.6-4.6-1.4-2.1-3.6-2.4-4.4-2.4-1.9-.2-3.7 1.1-4.6 1.1-1 0-2.4-1.1-4-1.1-2 0-3.9 1.2-5 3-2.1 3.7-.5 9.2 1.5 12.2 1 1.5 2.2 3.1 3.8 3 1.5-.1 2.1-1 4-1s2.4 1 4 1c1.7 0 2.7-1.5 3.7-3 1.2-1.7 1.7-3.4 1.7-3.5-.1 0-3.3-1.3-3.3-4.7zM15 4.9c.8-1 1.4-2.4 1.2-3.9-1.2.1-2.7.8-3.5 1.9-.8.9-1.5 2.4-1.3 3.8 1.4.1 2.8-.7 3.6-1.8z"/>
+      </svg>
+      Download on the App Store
+    </a>
+  </div>
+</header>
+
+<section class="features">
+  <div class="wrap">
+    <h2>How it plays</h2>
+    <div class="cards">
+      <div class="card">
+        <span class="emoji">❄️</span>
+        <h3>Your cannon is your engine</h3>
+        <p>There's no joystick. Firing a snowball kicks your tank the other
+           way — chain shots to skate, dodge, and line up the perfect angle.</p>
+      </div>
+      <div class="card">
+        <span class="emoji">🎯</span>
+        <h3>Every enemy fights differently</h3>
+        <p>Fast tanks dart, heavies shrug off hits, snipers punish you from
+           across the lake — and reinforcements arrive in waves.</p>
+      </div>
+      <div class="card">
+        <span class="emoji">👑</span>
+        <h3>Bosses, chests &amp; daily rewards</h3>
+        <p>Face a boss every 10 levels, open victory chests to upgrade your
+           tank, and claim your Daily Frost Bonus every time you return.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="shots">
+  <div class="wrap">
+    <h2>On the ice</h2>
+    <!-- ⬇️ Drop three portrait screenshots into the repo named
+         screenshot-1.png, screenshot-2.png, screenshot-3.png.
+         Any that are missing simply won't show. -->
+    <div class="shot-row">
+      <img src="screenshot-1.png" alt="Frostillery gameplay: player tank sliding across the frozen lake" onerror="this.style.display='none'">
+      <img src="screenshot-2.png" alt="Frostillery gameplay: battling multiple enemy tanks" onerror="this.style.display='none'">
+      <img src="screenshot-3.png" alt="Frostillery gameplay: boss battle" onerror="this.style.display='none'">
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>© 2026 Amiel Herrick Games. All rights reserved.</p>
+    <div class="foot-links">
+      <!-- ⬇️ REPLACE with your real privacy policy URL -->
+      <a href="privacy.html">Privacy Policy</a>
+      <!-- ⬇️ REPLACE with your support email -->
+      <a href="mailto:support@example.com">Contact</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
